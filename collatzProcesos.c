@@ -27,22 +27,24 @@ int main(){
     id = fork();
     int aux = n;
     if (id < 0)
-    	exit(-1);	
+    	exit(-1);
     if (id == 0){
-        close(tubo[0]);
-	write(tubo[1], &aux, sizeof(int));
+        close(tubo[0]); //Cierro para que no se pueda leer
+        write(tubo[1], &aux, sizeof(int));
         while(aux > 1){
             aux = collatz(aux);
-            write(tubo[1], &aux, sizeof(int));
+            write(tubo[1], &aux, sizeof(int)); //Escribo
         }
+        close(tubo[1]); //Cuando termino de escribir cierro para escritura
     }
     else{
-    	close(tubo[1]);
+    	close(tubo[1]); //Cierro para que no se pueda escribir
     	printf("\nValores: \n");
-        while(aux > 1){     
-	read(tubo[0], &aux, sizeof(int));
-	printf("%d \n", aux);
+        while(aux > 1){
+            read(tubo[0], &aux, sizeof(int));
+            printf("%d \n", aux);
         }
+        close(tubo[0]); //Cuando termino cierro para lectura
     }
 
 }

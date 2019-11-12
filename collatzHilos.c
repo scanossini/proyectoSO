@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -6,39 +7,57 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-//gcc -pthread collatzHilos.c
+pthread_t hiloCollatz;
+FILE* archivo;
 
-void* collatz(void* n){
-	int val = *(int*) n;
-	if (val > 0){
-		if (val % 2 == 0)
-			return (void*) (val / 2);
-		else
-			return (void*) (3 * val + 1);
-	}
-	return (void*) 0;
+void *collatz(void* num){
+    int n = *((int *) num);
+    archivo= fopen("Archivo de datos", "w");
+    if (archivo==NULL){
+        printf("El archivo no se puede abrir \n");
+        exit(1);
+    }
+    else{
+        while( n > 1){
+                fprintf(archivo, "%d \n", n);
+                if (n > 0){
+                    if (n % 2 == 0) {
+                        n = n/2;
+                    }
+                    else {
+                        n = 3*n+1;
+                    }
+                }
+        }
+        fprintf(archivo, "%d", n); //El valor 1 se debe agregar aparte ya que es la condicion de corte
+        fclose(archivo);
+    }
+
 }
-
 
 int main(){
-	int valor;
+	int numero;
+	int aux;
 	do{
     	printf("Ingrese un entero positivo: ");
-    	scanf("%d", &valor);
-    	if (valor < 0)
+    	scanf("%d", &numero);
+    	if (numero < 0)
     		printf("No es un entero positivo.\n");
-    }while (valor < 0);
+    }while (numero < 0);
 
-	FILE* archivo;
-	archivo = fopen("test.txt", "a");
-	pthread_t hiloCollatz;
-	
-	printf("\nValores: \n");
-	while(valor > 1){
-		printf("%d \n",valor);
-		fprintf(archivo,"%d \n", valor);
-		pthread_create(&hiloCollatz, NULL, collatz, &valor);
-		pthread_join(hiloCollatz, (void*) &valor);      
-	}
+    pthread_create(&hiloCollatz,NULL,collatz,(void*)&numero); //Hilo que me realizara la funcion Collatz
+    pthread_join(hiloCollatz,NULL);
 
+    archivo= fopen("Archivo de datos","rb");
+
+    printf("\nValores: \n");
+    while (feof(archivo)==0){
+        fscanf(archivo,"%d", &aux);
+        printf("%d \n",aux);
+    }
+
+    fclose(archivo);
+    return 0;
 }
+
+
