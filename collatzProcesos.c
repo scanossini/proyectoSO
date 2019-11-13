@@ -17,18 +17,18 @@ int main(){
     int n;
     pid_t id;
     int tubo[2];
-    pipe(tubo);
+    pipe(tubo); //Creo pipe
     do{
         printf("Ingrese un entero positivo: ");
         scanf("%d", &n);
         if (n < 0)
             printf("No es un entero positivo.\n");
-    } while (n < 0);
-    id = fork();
+    } while (n < 0); //Hasta que no se ingrese un numero mayor a 1
+    id = fork(); //Creo un proceso hijo
     int aux = n;
-    if (id < 0)
+    if (id < 0) //Eror
     	exit(-1);
-    if (id == 0){
+    if (id == 0){ //Proceso hijo se encarga de aplicar el algoritmo
         close(tubo[0]); //Cierro para que no se pueda leer
         write(tubo[1], &aux, sizeof(int));
         while(aux > 1){
@@ -37,7 +37,7 @@ int main(){
         }
         close(tubo[1]); //Cuando termino de escribir cierro para escritura
     }
-    else{
+    else{ //Proceso padre se encarga de mostrar los resultados
     	close(tubo[1]); //Cierro para que no se pueda escribir
     	printf("\nValores: \n");
         while(aux > 1){
