@@ -7,117 +7,118 @@
 #include <errno.h>
 #include <sys/wait.h>
 
-#define N 5
-#define M 6
+#define N 7
+#define M 7
 
-pthread_t hiloAscensor;
-pthread_t hilosPersonas[N];
+pthread_t personas[N];
+pthread_t ascensorT;
 
 sem_t personasEnAscensorSubiendo;
 sem_t personasEnAscensorBajando;
-sem_t puertasAbiertasParaSubir[N];
-sem_t puertasAbiertasParaBajar[N];
-sem_t personasSuben[N];
-sem_t personasBajan[N];
 
-void* funcAscensor(void* args);
-void* funcPersona(void* args);
+sem_t puertasAbiertasPSubir[N];
+sem_t puertasAbiertasPBajar[N];
 
-int personasRestantes = N;
-int id[N];
+sem_t persPSubir[N];
+sem_t persPBajar[N];
 
-int main(int argc, char const *argv[]) {
+void* ascensor();
+void* persona(void* args);
 
+int main () {
+
+    int j;
     sem_init(&personasEnAscensorBajando, 0, 0);
 	sem_init(&personasEnAscensorSubiendo, 0, 0);
 
 	srand(time(NULL));
 
 	for(int i = 0; i < N; i++){
-        sem_init(&(puertasAbiertasParaSubir[i]),0,0);
-        sem_init(&(puertasAbiertasParaBajar[i]),0,0);
-        sem_init(&(personasSuben[i]),0,0);
-        sem_init(&(personasBajan[i]),0,0);
+        sem_init(&(puertasAbiertasPSubir[i]),0,0);
+        sem_init(&(puertasAbiertasPBajar[i]),0,0);
+        sem_init(&(persPSubir[i]),0,0);
+        sem_init(&(persPBajar[i]),0,0);
 	}
 
-	printf("Personas: %d, pisos: %d\n\n", N, M);
+	//Inicializo el ascensor
+	pthread_create(&ascensorT, NULL, ascensor, NULL);
 
-	for(int j = 0; j < N; j++){//se pasa como parametro al hilo para evitar errores en tiempo de ejecucion
-        id[j] = j+1;
-	}
-
-	pthread_create(&hiloAscensor, NULL, funcAscensor, NULL);
+	//Inicializo todas las personas
 	for(int p = 0; p < N; p++){
-        pthread_create(&hilosPersonas[id[p]], NULL, funcPersona, (void*)p);
+        pthread_create(&personas[p], NULL, persona, (void*)p);
 	}
 
-	for(int k = 0; k < N; k++){
-        pthread_join(hilosPersonas[k], NULL);
+	//Espero que finalicen todas las personas
+	for(int h = 0; h < N; h++){
+        pthread_join(personas[h],NULL);
 	}
 
-	pthread_join(hiloAscensor, NULL);
+	//Espero finalice el hilo ascensor
+	pthread_join(ascensorT, NULL);
 
+    printf("No hay mas personas \n");
     return 0;
 }
 
-void* funcPersona(void* args){
-
-    int origen = rand() % M;
-	int destino = -1;
-    int numPersona = (intptr_t) args;
-
-    while(destino == -1 || destino == origen)
-        destino = rand() % M;
-
-    sem_post(&personasSuben[origen]);//llamar al ascensor
-
-    printf("Persona %d: pide el ascensor. Origen piso %d, destino piso %d.\n", numPersona, origen, destino);
-
-    sem_wait(&puertasAbiertasParaSubir[origen]);
-    sem_post(&personasEnAscensorSubiendo);      //cerrar la puerta
-    printf("Persona %d: sube al ascensor \n", numPersona);
-
-    sem_post(&personasBajan[destino]);
-
-    sem_wait(&puertasAbiertasParaBajar[destino]);
-    sem_post(&personasEnAscensorBajando);//cerrar la puerta
-
-    printf("Persona %d: baja del ascensor en el piso %d \n", numPersona, destino);
-    personasRestantes--;
+void controlDescensoDePasajeros(int piso){
+    while(sem_trywait(&persPBajar[piso])!=-1){ //Mientras haya alguien para bajar, le abro la puerta y espero que se baje
+        sem_post(&puertasAbiertasPBajar[piso]);
+        sem_wait(&personasEnAscensorBajando);
+    }
 }
 
-void* funcAscensor(void* args){
+void controlAscensoDePasajeros(int piso){
+    while(sem_trywait(&persPSubir[piso])!=-1){ //Mientras haya alguien para subir, le abro la puerta y espero que suba
+        sem_post(&puertasAbiertasPSubir[piso]);
+        sem_wait(&personasEnAscensorSubiendo);
+    }
+}
 
-    while(personasRestantes > 0){
+void* ascensor(){
+    int i, piso;
 
-        for(int i = 0; i < M; i++){
-            printf("Ascensor subiendo: piso %d.\n", i);
-            while(sem_trywait(&personasBajan[i]) != -1){
-                //mientras haya alguien para bajar, se abre la puerta y espera que se baje
-                sem_post(&puertasAbiertasParaBajar[i]);
-                sem_wait(&personasEnAscensorBajando);
-            }
-            while(sem_trywait(&personasSuben[i])!=-1){
-                //mientras haya alguien para subir, se abre la puerta y espera que suba
-                sem_post(&puertasAbiertasParaSubir[i]);
-                sem_wait(&personasEnAscensorSubiendo);
-            }
+    while(1){
+
+        for(piso = 0; piso <= N-1; piso++){ // Subir
+            printf("**INFO*,ascensor ascendiendo, piso actual %d \n", piso);
+            controlDescensoDePasajeros(piso);
+            controlAscensoDePasajeros(piso);
             sleep(1);
         }
 
-        for(int j = M-1; j > 0; j--){
-            printf("Ascensor bajando: piso %d.\n", j);
-            while(sem_trywait(&personasBajan[j]) == 0){
-                sem_post(&puertasAbiertasParaBajar[j]);
-                sem_wait(&personasEnAscensorBajando);
-            }
-            while(sem_trywait(&personasSuben[j]) == 0){
-                sem_post(&puertasAbiertasParaSubir[j]);
-                sem_wait(&personasEnAscensorSubiendo);
-            }
+        for(i = N-1; i >= 0; i--){ // Bajar
+            printf("**INFO**,ascensor descendiendo, piso actual %d \n", i);
+            controlDescensoDePasajeros(i);
+            controlAscensoDePasajeros(i);
             sleep(1);
         }
     }
-    printf("No hay mas personas.\n");
-    pthread_exit(0);
+}
+
+void* persona(void* args){
+    int id = (intptr_t)args;
+    int origen = rand() % M;
+	int destino;
+
+	do{
+        destino = rand() % M;
+	}while(destino == origen); //Genero un random de destino hasta que destino sea distinto de origen
+
+
+    printf("Soy la persona %d: origen %d, destino %d\n", id, origen, destino);
+
+    sem_post(&persPSubir[origen]);//Llamo al ascensor
+
+    printf("Soy persona %d y pedi el ascensor\n", id);
+
+    sem_wait(&puertasAbiertasPSubir[origen]); // Espera a que llegue
+    sem_post(&personasEnAscensorSubiendo); //Se cierra la puerta
+    printf("Soy persona %d y me subi al ascensor \n", id);
+
+    sem_post(&persPBajar[destino]); //Interaccion piso al que queres ir
+
+    sem_wait(&puertasAbiertasPBajar[destino]); //Espera que se abra la puerta para salir
+    sem_post(&personasEnAscensorBajando); //Cerrar la puerta
+
+    printf("Soy persona %d y me baje del ascensor en el piso %d \n", id, destino);
 }
